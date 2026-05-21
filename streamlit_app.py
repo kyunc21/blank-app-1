@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 from enum import Enum
 from typing import List, Optional
 from decimal import Decimal
@@ -408,78 +409,26 @@ with tab_amt:
 # 5. ENGINE TRIGGERS & EVALUATION
 # ==========================================
 st.write("---")
-if st.button("⚡ Run Tax Engine Calculation", type="primary", use_container_width=True):
-    try:
-        # 1. Validate structure on-the-fly inside Pydantic structures
-        profile_instance = TaxpayerProfile(
-            full_name=full_name, id_number=id_number, sex_nationality=sex_nat,
-            date_of_birth=dob, residence_address=res_addr, contact_address=cont_addr,
-            email=email_input, telephone=telephone, housing_status=HousingStatus(h_status),
-            filed_past_five_years=False
-        )
-        
-        income_instances = [
-            IncomeEntry(
-                category=IncomeCategory(inc_category), 
-                source_entity_details=entity, 
-                gross_amount=Decimal(str(gross_amt)), 
-                withholding_tax=Decimal(str(withholding))
-            )
-        ]
-        
-        deductions_instance = DeductionsRegistry(
-            is_married=is_married,
-            use_itemized=use_itemized,
-            donations=Decimal(str(donations)),
-            insurance_premiums=Decimal(str(insurance)),
-            medical_maternity=Decimal(str(medical)),
-            mortgage_interest=Decimal(str(mortgage)),
-            savings_and_investment=Decimal(str(savings_inv)),
-            educational_tuition=Decimal(str(edu_tuition)),
-            pre_school_children=Decimal(str(pre_school)),
-            housing_rent=Decimal(str(house_rent)),
-            foreign_income=Decimal(str(amt_foreign)),
-            insurance_benefits=Decimal(str(amt_insurance)),
-            private_securities=Decimal(str(amt_securities)),
-            has_salary_income=has_salary,
-            disability_count=int(disability_cnt),
-            long_term_care_count=int(ltc_cnt),
-            dividend_income=Decimal(str(dividend_amt))
-        )
-        
-        session = TaxFilingSession(
-            profile=profile_instance, 
-            income_entries=income_instances, 
-            deductions=deductions_instance
-        )
-        
-        # 2. Pass directly into your core computation engine
-        metrics = TaxCalculator.calculate(session)
-        
-        # 3. Render Visual Layout Metrics Summary
-        st.success("Calculation Completed!")
-        
-        res_col1, res_col2, res_col3 = st.columns(3)
-        with res_col1:
-            st.metric("Total Gross Income", f"${metrics['total_gross_income']:,} TWD")
-            st.metric("Total Exemptions Allowed", f"${metrics['total_exemptions']:,} TWD")
-        with res_col2:
-            st.metric("Total Deductions Applied", f"${metrics['total_deductions']:,} TWD")
-            if metrics['amt_supplementary_due'] > 0:
-                st.metric("AMT Supplementary Tax Due", f"${metrics['amt_supplementary_due']:,} TWD", delta="AMT Triggered", delta_color="inverse")
-            else:
-                st.metric("AMT System Status", "Passed Safety Margin", delta="Regular Rate Applies")
-        with res_col3:
-            st.metric("Net Taxable Base", f"${metrics['net_taxable_income']:,} TWD")
-            st.metric("Gross Tax Payable", f"${metrics['gross_tax_payable']:,} TWD")
+if st.button("⚡ Run Tax Engine Calculation"):
+    # Package the UI inputs into a clean payload
+    # Package the UI inputs into a clean payload
+    payload = {
+        "full_name": name_field,
+        "id_number": id_number_input,
+        "email": email_input,
+        "dob": str(dob_input),
+        "housing_status": housing_status_input
+    }
+    
+    # Send it to your local API backend securely
+    with st.spinner("Calculating via secure engine..."):
+        try:
+            response = requests.post("http://localhost:8000/api/v1/calculate", json=payload)
             
-            # Showcase Final Reconciliation details
-            recon_amount = f"${metrics['final_reconciliation_amount']:,} TWD"
-            if metrics["balance_status"] == "REFUND":
-                st.metric("🎉 Final Status: REFUND", recon_amount, delta="Refund Owed to You")
+            if response.status_code == 200:
+                result = response.json()
+                st.success(f"Calculation Complete! Result: {result['tax_liability']}")
             else:
-                st.metric("⚠️ Final Status: BALANCE DUE", recon_amount, delta="-Payment Required", delta_color="inverse")
-                
-    except Exception as e:
-        st.error(f"Data Schema Structure Verification Failed: {str(e)}")
-        st.info(f"💡 **Automated Dividend Tax Optimization Strategy Selected:** {metrics['chosen_strategy']}")
+                st.error("Engine processing failed securely.")
+        except Exception as e:
+            st.error(f"Unexpected error: {str(e)}")
