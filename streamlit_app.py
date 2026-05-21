@@ -413,7 +413,7 @@ if st.button("⚡ Run Tax Engine Calculation"):
     # Package the UI inputs into a clean payload
     # Package the UI inputs into a clean payload
     payload = {
-        "full_name": name_field,
+        "full_name": full_name_input,
         "id_number": id_number_input,
         "email": email_input,
         "dob": str(dob_input),
